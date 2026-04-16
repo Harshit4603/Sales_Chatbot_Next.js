@@ -3,27 +3,58 @@
 import { useState } from "react";
 
 export default function Home() {
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<
+    { role: "user" | "bot"; text: string }[]
+  >([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
+  const BACKEND_URL = "https://sales-chatbot-7wsa.onrender.com"; // your API
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+
+    const userMessage = input;
 
     // Add user message
-    setMessages((prev) => [...prev, "You: " + input]);
+    setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
 
-    // Show loading message
-    setMessages((prev) => [...prev, "Bot: Thinking..."]);
+    // Clear input
+    setInput("");
 
-    // Simulate backend response
-    setTimeout(() => {
+    // Show loading
+    setLoading(true);
+    setMessages((prev) => [
+      ...prev,
+      { role: "bot", text: "Thinking..." },
+    ]);
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: userMessage,
+        }),
+      });
+
+      const data = await response.json();
+
+      // Replace "Thinking..." with real response
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        "Bot: This is a sample response",
+        { role: "bot", text: data.response || "No response from server" },
       ]);
-    }, 1000);
-
-    setInput("");
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev.slice(0, -1),
+        { role: "bot", text: "Error connecting to server" },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -32,7 +63,7 @@ export default function Home() {
       {/* Sidebar */}
       <aside className="w-64 border-r border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
         <h2 className="text-lg font-semibold mb-4">Chats</h2>
-        <p className="text-sm text-zinc-500">No conversations yet</p>
+        <p className="text-sm text-zinc-500">Demo Conversation</p>
       </aside>
 
       {/* Main Chat Area */}
@@ -50,14 +81,18 @@ export default function Home() {
           {messages.map((msg, index) => (
             <div
               key={index}
-              className="p-2 rounded bg-white dark:bg-zinc-800 border"
+              className={`p-2 rounded max-w-[70%] ${
+                msg.role === "user"
+                  ? "ml-auto bg-black text-white"
+                  : "bg-white dark:bg-zinc-800 border"
+              }`}
             >
-              {msg}
+              {msg.text}
             </div>
           ))}
         </div>
 
-        {/* Input Box */}
+        {/* Input */}
         <div className="p-4 border-t border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex gap-2">
           <input
             type="text"
@@ -69,9 +104,10 @@ export default function Home() {
           />
           <button
             onClick={sendMessage}
-            className="bg-black text-white px-4 py-2 rounded"
+            disabled={loading}
+            className="bg-black text-white px-4 py-2 rounded disabled:opacity-50"
           >
-            Send
+            {loading ? "..." : "Send"}
           </button>
         </div>
 
